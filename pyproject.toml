@@ -36,6 +36,7 @@ dev = [
 [project.scripts]
 taskyn = "taskyn.cli.main:app"
 taskyn-service = "taskyn.service:handle_command_line"
+taskyn-ui = "taskyn.web.ui_cli:app"
 
 [build-system]
 requires = ["hatchling"]
