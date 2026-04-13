@@ -65,7 +65,7 @@ async def init_mcp_client() -> None:
         logger.info("Connecting to MCP server at %s", settings["url"])
         _mcp_client = Client(settings["url"], timeout=settings["timeout"])
 
-    await _mcp_client.__aenter__()
+    _mcp_client = await _mcp_client.__aenter__()
     _mcp_client_owned = True
     logger.info("MCP client connected successfully")
 

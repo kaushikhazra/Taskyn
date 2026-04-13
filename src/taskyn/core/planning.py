@@ -912,52 +912,74 @@ def get_weekly_plan(
         plans_by_date.setdefault(d_str, []).append(plan_dict)
         plan_ids.append(row["id"])
 
-    # Build 7-slot day list (index 0 = Monday … index 6 = Sunday)
-    days: list[list[dict]] = []
-    for i in range(7):
-        day = monday + timedelta(days=i)
-        days.append(plans_by_date.get(day.isoformat(), []))
-
-    # Aggregate outcome counts and totals
+    # Build per-day WeeklyDaySummary objects (index 0 = Monday … index 6 = Sunday)
+    day_summaries: list[dict] = []
     outcome_counts: dict[str, int] = {o.value: 0 for o in PlanOutcome}
     total_planned_items = 0
     total_planned_minutes = 0
 
-    if plan_ids:
-        placeholders = ",".join("?" * len(plan_ids))
-        item_rows = fetchall(
-            f"SELECT outcome, planned_minutes FROM plan_items "
-            f"WHERE plan_id IN ({placeholders})",
-            tuple(plan_ids),
-        )
-        for row in item_rows:
-            total_planned_items += 1
-            total_planned_minutes += row["planned_minutes"] or 0
-            oc = row["outcome"]
-            outcome_counts[oc] = outcome_counts.get(oc, 0) + 1
+    for i in range(7):
+        day = monday + timedelta(days=i)
+        day_str = day.isoformat()
+        day_plans = plans_by_date.get(day_str, [])
 
-    # Actual minutes from completed time entries during the week
+        plan_id = day_plans[0]["id"] if day_plans else None
+        status = day_plans[0]["status"] if day_plans else None
+
+        day_outcomes: dict[str, int] = {o.value: 0 for o in PlanOutcome}
+        day_planned_minutes = 0
+        item_count = 0
+
+        for plan in day_plans:
+            for item in plan.get("items", []):
+                item_count += 1
+                day_planned_minutes += item.get("planned_minutes") or 0
+                oc = item.get("outcome")
+                if oc:
+                    day_outcomes[oc] = day_outcomes.get(oc, 0) + 1
+                    outcome_counts[oc] = outcome_counts.get(oc, 0) + 1
+
+        total_planned_items += item_count
+        total_planned_minutes += day_planned_minutes
+
+        day_summaries.append({
+            "date": day_str,
+            "plan_id": plan_id,
+            "status": status,
+            "item_count": item_count,
+            "outcomes": day_outcomes,
+            "planned_minutes": day_planned_minutes,
+            "actual_minutes": 0,  # filled in below
+        })
+
+    # Per-day actual minutes from completed time entries during the week
     te_cond = " AND actor = ?" if actor is not None else ""
     te_params: tuple = (actor,) if actor is not None else ()
     week_start_ts = monday.isoformat() + "T00:00:00"
     week_end_ts = (sunday + timedelta(days=1)).isoformat() + "T00:00:00"
 
-    te_row = fetchone(
+    te_rows = fetchall(
         f"""
-        SELECT COALESCE(SUM(duration_minutes), 0) AS total
+        SELECT DATE(started_at) AS te_date,
+               COALESCE(SUM(duration_minutes), 0) AS day_actual
         FROM time_entries
         WHERE started_at >= ? AND started_at < ?
           AND ended_at IS NOT NULL
           {te_cond}
+        GROUP BY DATE(started_at)
         """,
         (week_start_ts, week_end_ts) + te_params,
     )
-    actual_minutes = te_row["total"] if te_row else 0
+    te_by_date = {row["te_date"]: row["day_actual"] for row in te_rows}
+    for ds in day_summaries:
+        ds["actual_minutes"] = te_by_date.get(ds["date"], 0)
+
+    actual_minutes = sum(ds["actual_minutes"] for ds in day_summaries)
 
     return {
         "week_start": monday,
         "week_end": sunday,
-        "days": days,
+        "days": day_summaries,
         "summary": {
             "total_planned_items": total_planned_items,
             "total_planned_minutes": total_planned_minutes,
@@ -1004,7 +1026,7 @@ def get_monthly_plan(
 
     # Fetch plans for the month
     plan_rows = fetchall(
-        f"SELECT id, date, actor FROM plans "
+        f"SELECT id, date, actor, status FROM plans "
         f"WHERE date BETWEEN ? AND ?{actor_cond}",
         (first_day.isoformat(), last_day.isoformat()) + actor_params,
     )
@@ -1013,6 +1035,7 @@ def get_monthly_plan(
     days_with_plans_set: set[str] = set()
     plan_actor_map: dict[str, str] = {}
     plan_date_map: dict[str, str] = {}
+    plan_status_map: dict[str, str] = {}
 
     for row in plan_rows:
         d_str = row["date"] if isinstance(row["date"], str) else row["date"].isoformat()
@@ -1020,6 +1043,21 @@ def get_monthly_plan(
         days_with_plans_set.add(d_str)
         plan_actor_map[row["id"]] = row["actor"]
         plan_date_map[row["id"]] = d_str
+        plan_status_map[row["id"]] = row["status"]
+
+    # Per-day item stats (plan_id → stats)
+    per_day_stats: dict[str, dict] = {}
+    for plan_id in plan_ids:
+        d_str = plan_date_map[plan_id]
+        if d_str not in per_day_stats:
+            per_day_stats[d_str] = {
+                "plan_id": plan_id,
+                "status": plan_status_map[plan_id],
+                "item_count": 0,
+                "outcomes": {o.value: 0 for o in PlanOutcome},
+                "planned_minutes": 0,
+                "actual_minutes": 0,
+            }
 
     # Aggregate plan item statistics
     outcome_counts: dict[str, int] = {o.value: 0 for o in PlanOutcome}
@@ -1039,6 +1077,15 @@ def get_monthly_plan(
             total_planned_minutes += row["planned_minutes"] or 0
             oc = row["outcome"]
             outcome_counts[oc] = outcome_counts.get(oc, 0) + 1
+
+            # Per-day stats
+            d_str = plan_date_map.get(row["plan_id"])
+            if d_str and d_str in per_day_stats:
+                per_day_stats[d_str]["item_count"] += 1
+                per_day_stats[d_str]["planned_minutes"] += row["planned_minutes"] or 0
+                per_day_stats[d_str]["outcomes"][oc] = (
+                    per_day_stats[d_str]["outcomes"].get(oc, 0) + 1
+                )
 
             if actor is None:
                 a = plan_actor_map.get(row["plan_id"], "unknown")
@@ -1072,17 +1119,23 @@ def get_monthly_plan(
     te_cond = " AND actor = ?" if actor is not None else ""
     te_params: tuple = (actor,) if actor is not None else ()
 
-    te_row = fetchone(
+    te_rows_month = fetchall(
         f"""
-        SELECT COALESCE(SUM(duration_minutes), 0) AS total
+        SELECT DATE(started_at) AS te_date,
+               COALESCE(SUM(duration_minutes), 0) AS day_actual
         FROM time_entries
         WHERE started_at >= ? AND started_at < ?
           AND ended_at IS NOT NULL
           {te_cond}
+        GROUP BY DATE(started_at)
         """,
         (month_start_ts, month_end_ts) + te_params,
     )
-    actual_minutes = te_row["total"] if te_row else 0
+    te_by_date_month = {row["te_date"]: row["day_actual"] for row in te_rows_month}
+    for d_str, ds in per_day_stats.items():
+        ds["actual_minutes"] = te_by_date_month.get(d_str, 0)
+
+    actual_minutes = sum(row["day_actual"] for row in te_rows_month)
 
     # Per-actor actual minutes (only when not filtering by actor)
     if actor is None and per_actor_data:
@@ -1128,6 +1181,12 @@ def get_monthly_plan(
         for row in milestone_rows
     ]
 
+    # Build sorted per-day list for calendar grid
+    days_list = sorted(
+        [{"date": d_str, **stats} for d_str, stats in per_day_stats.items()],
+        key=lambda x: x["date"],
+    )
+
     return {
         "year": year,
         "month": month,
@@ -1137,6 +1196,7 @@ def get_monthly_plan(
         "total_planned_minutes": total_planned_minutes,
         "outcomes": outcome_counts,
         "actual_minutes": actual_minutes,
+        "days": days_list,
         "per_actor": list(per_actor_data.values()) if actor is None else [],
         "milestones": milestones,
     }
