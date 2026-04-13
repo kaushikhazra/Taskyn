@@ -70,10 +70,37 @@ export function usePlannerParams(): PlannerParams {
     (newView: PlannerView) => {
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
+        // Capture old view BEFORE overwriting it
+        const oldView = (prev.get('view') as PlannerView) ?? 'day';
         next.set('view', newView);
-        // Snap current date for the new view
+        // Snap current date for the new view.
+        // When switching TO day view, prefer today if today falls within the
+        // currently displayed period (avoids landing on a month/week anchor like
+        // the 1st of the month instead of today).
         const currentDate = parseDate(next.get('date'));
-        next.set('date', toISODate(snapDate(currentDate, newView)));
+        let resolvedDate = currentDate;
+        if (newView === 'day') {
+          const today = new Date();
+          const todayISO = toISODate(today);
+          if (oldView === 'month') {
+            // Today is within the displayed month
+            if (
+              today.getFullYear() === currentDate.getFullYear() &&
+              today.getMonth() === currentDate.getMonth()
+            ) {
+              resolvedDate = today;
+            }
+          } else if (oldView === 'week') {
+            // Today is within the displayed week (Mon–Sun)
+            const weekStart = snapToWeekStart(currentDate);
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+            if (todayISO >= toISODate(weekStart) && todayISO <= toISODate(weekEnd)) {
+              resolvedDate = today;
+            }
+          }
+        }
+        next.set('date', toISODate(snapDate(resolvedDate, newView)));
         return next;
       });
     },
