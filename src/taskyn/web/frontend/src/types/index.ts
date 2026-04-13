@@ -314,3 +314,248 @@ export interface RegisterRequest {
 export interface TokenResponse {
   accessToken: string;
 }
+
+// ============================================================
+// Plans — Enums
+// ============================================================
+
+export const PLAN_STATUSES = ['active', 'completed'] as const;
+export type PlanStatus = typeof PLAN_STATUSES[number];
+
+export const PLAN_OUTCOMES = ['pending', 'completed', 'partial', 'carried_over', 'dropped'] as const;
+export type PlanOutcome = typeof PLAN_OUTCOMES[number];
+
+// ============================================================
+// Plans — Core Models
+// ============================================================
+
+/** A single day's plan for one actor. */
+export interface Plan {
+  id: string;
+  date: string;                          // "YYYY-MM-DD"
+  actor: string;
+  status: PlanStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  items: PlanItemEnriched[];             // always present on get/create responses
+}
+
+/** Plan item as stored — no node enrichment. */
+export interface PlanItem {
+  id: string;
+  plan_id: string;
+  node_id: string | null;
+  planned_minutes: number | null;
+  display_order: number;
+  outcome: PlanOutcome;
+  outcome_notes: string | null;
+  carried_to_plan_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Plan item enriched with joined node/project data (returned by get_plan). */
+export interface PlanItemEnriched extends PlanItem {
+  node_title: string | null;
+  node_status: string | null;
+  node_type: string | null;
+  project_id: string | null;
+  project_name: string | null;
+  estimated_minutes: number | null;
+  actual_time: number | null;
+  node_deleted: boolean;
+}
+
+// ============================================================
+// Plans — Create / Update DTOs
+// ============================================================
+
+export interface PlanCreate {
+  date: string;                          // "YYYY-MM-DD"
+  actor: string;
+  notes?: string;
+  items?: PlanItemSeed[];
+}
+
+export interface PlanItemSeed {
+  node_id: string;
+  planned_minutes?: number;
+  display_order?: number;                // matches backend PlanItemInline field name
+}
+
+export interface PlanUpdate {
+  notes?: string;
+  status?: PlanStatus;
+}
+
+export interface PlanItemAdd {
+  node_id: string;
+  planned_minutes?: number;
+  position?: number;
+}
+
+export interface PlanItemUpdate {
+  outcome?: PlanOutcome;
+  outcome_notes?: string;
+  planned_minutes?: number;
+}
+
+export interface PlanItemReorder {
+  new_position: number;
+}
+
+// ============================================================
+// Plans — Carry-Over
+// ============================================================
+
+export interface CarryOverRequest {
+  target_date: string;                   // "YYYY-MM-DD"
+  item_ids?: string[];                   // null = carry all eligible
+}
+
+export interface CarryOverResult {
+  source_plan_id: string;
+  target_plan: Plan;
+  carried_count: number;
+  skipped: CarryOverSkip[];
+}
+
+export interface CarryOverSkip {
+  item_id: string;
+  node_id: string | null;
+  reason: string;
+}
+
+// ============================================================
+// Plans — Weekly View
+// ============================================================
+
+export interface WeeklyPlan {
+  week_start: string;                    // "YYYY-MM-DD" (Monday)
+  week_end: string;                      // "YYYY-MM-DD" (Sunday)
+  days: WeeklyDaySummary[];              // 7 entries (Mon–Sun), per-day summary
+  summary: WeeklyPlanSummary;
+}
+
+/** Per-day summary for WeekGrid — lightweight, no full Plan/item payloads. */
+export interface WeeklyDaySummary {
+  date: string;                          // "YYYY-MM-DD"
+  plan_id: string | null;               // null if no plan for this day
+  status: PlanStatus | null;
+  item_count: number;
+  outcomes: Record<PlanOutcome, number>;
+  planned_minutes: number;
+  actual_minutes: number;
+}
+
+export interface WeeklyPlanSummary {
+  total_planned_items: number;
+  total_planned_minutes: number;
+  outcomes: Record<PlanOutcome, number>;
+  actual_minutes: number;
+}
+
+// ============================================================
+// Plans — Monthly View
+// ============================================================
+
+export interface MonthlyPlan {
+  year: number;
+  month: number;
+  days_in_month: number;
+  days_with_plans: number;
+  total_planned_items: number;
+  total_planned_minutes: number;
+  outcomes: Record<PlanOutcome, number>;
+  actual_minutes: number;
+  days: MonthlyDaySummary[];            // per-day breakdown for calendar grid
+  per_actor: MonthlyActorSummary[];
+  milestones: MonthlyMilestone[];
+}
+
+/** Per-day summary for MonthCalendarGrid — one entry per day that has a plan. */
+export interface MonthlyDaySummary {
+  date: string;                          // "YYYY-MM-DD"
+  plan_id: string;
+  status: PlanStatus;
+  item_count: number;
+  outcomes: Record<PlanOutcome, number>;
+  planned_minutes: number;
+  actual_minutes: number;
+}
+
+export interface MonthlyActorSummary {
+  actor: string;
+  days_with_plans: number;
+  total_planned_items: number;
+  total_planned_minutes: number;
+  outcomes: Record<PlanOutcome, number>;
+  actual_minutes: number;
+}
+
+export interface MonthlyMilestone {
+  id: string;
+  name: string;
+  project_id: string;
+  project_name: string;
+  target_date: string | null;
+  status: string;
+}
+
+// ============================================================
+// Plans — Plan vs Actual
+// ============================================================
+
+export interface PlanVsActual {
+  date: string;
+  actor: string;
+  planned_items: PlanVsActualItem[];
+  unplanned_items: UnplannedItem[];
+  summary: PlanVsActualSummary;
+}
+
+export interface PlanVsActualItem {
+  node_id: string | null;
+  title: string | null;
+  planned_minutes: number | null;
+  display_order: number;
+  actual_minutes: number;
+  current_status: string | null;
+  is_terminal: boolean;
+  delta_minutes: number | null;
+  outcome: PlanOutcome;
+  outcome_notes: string | null;
+}
+
+export interface UnplannedItem {
+  node_id: string;
+  title: string;
+  actual_minutes: number;
+  current_status: string;
+  project_id: string;
+  project_name: string;
+}
+
+export interface PlanVsActualSummary {
+  total_planned_minutes: number;
+  total_actual_minutes: number;
+  total_unplanned_minutes: number;
+  planned_item_count: number;
+  completed_count: number;
+  unplanned_item_count: number;
+  overall_delta: number | null;
+}
+
+// ============================================================
+// Plans — Filter types (for list/query params)
+// ============================================================
+
+export interface PlanListFilters {
+  actor?: string;
+  date_from?: string;
+  date_to?: string;
+  status?: PlanStatus;
+  limit?: number;
+  offset?: number;
+}

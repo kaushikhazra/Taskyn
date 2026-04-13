@@ -21,6 +21,7 @@ from .routes.dashboard import router as dashboard_router
 from .routes.edges import router as edges_router
 from .routes.milestones import router as milestones_router
 from .routes.nodes import router as nodes_router
+from .routes.plans import router as plans_router
 from .routes.projects import router as projects_router
 from .routes.search import router as search_router
 from .routes.tags import router as tags_router
@@ -68,6 +69,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(companies_router, prefix="/api/v1")
 app.include_router(projects_router, prefix="/api/v1")
 app.include_router(nodes_router, prefix="/api/v1")
+app.include_router(plans_router, prefix="/api/v1")
 app.include_router(edges_router, prefix="/api/v1")
 app.include_router(milestones_router, prefix="/api/v1")
 app.include_router(tags_router, prefix="/api/v1")

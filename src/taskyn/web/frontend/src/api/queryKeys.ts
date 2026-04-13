@@ -6,6 +6,9 @@
  * TanStack Query matches by prefix.
  */
 
+// TODO: PlanListFilters will be provided by the types module (parallel worker)
+import type { PlanListFilters } from '@/types';
+
 export const queryKeys = {
   companies: {
     all: () => ['companies'] as const,
@@ -82,6 +85,29 @@ export const queryKeys = {
     list: () => [...queryKeys.tags.all(), 'list'] as const,
     usage: (name: string) =>
       [...queryKeys.tags.all(), 'usage', name] as const,
+  },
+
+  plans: {
+    all: () => ['plans'] as const,
+
+    list: (filters?: PlanListFilters) =>
+      [...queryKeys.plans.all(), 'list', filters] as const,
+
+    /** Primary daily lookup — keyed by date + actor. */
+    byDate: (date: string, actor: string) =>
+      [...queryKeys.plans.all(), 'byDate', date, actor] as const,
+
+    detail: (planId: string) =>
+      [...queryKeys.plans.all(), 'detail', planId] as const,
+
+    weekly: (weekStart: string, actor?: string) =>
+      [...queryKeys.plans.all(), 'weekly', weekStart, actor] as const,
+
+    monthly: (year: number, month: number, actor?: string) =>
+      [...queryKeys.plans.all(), 'monthly', year, month, actor] as const,
+
+    vsActual: (date: string, actor: string) =>
+      [...queryKeys.plans.all(), 'vsActual', date, actor] as const,
   },
 
   search: {

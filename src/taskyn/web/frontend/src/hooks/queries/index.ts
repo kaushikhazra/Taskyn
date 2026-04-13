@@ -5,3 +5,4 @@ export { useEdges } from './useEdges';
 export { useDashboard } from './useDashboard';
 export { useActivity } from './useActivity';
 export { useTimerCurrent, useTimeEntry } from './useTimerQuery';
+export { usePlan, usePlanById, usePlans, useWeeklyPlan, useMonthlyPlan, usePlanVsActual } from './usePlans';
