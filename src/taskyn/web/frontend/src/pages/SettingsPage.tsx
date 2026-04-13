@@ -130,12 +130,8 @@ export function SettingsPage() {
               </div>
               <div className="settings-item">
                 <div className="settings-item-info">
-                  <div className="settings-item-label">Member Since</div>
-                  <div className="settings-item-desc">
-                    {user?.created_at
-                      ? new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-                      : 'Unknown'}
-                  </div>
+                  <div className="settings-item-label">Instance</div>
+                  <div className="settings-item-desc">Local</div>
                 </div>
               </div>
             </div>

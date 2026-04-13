@@ -1,9 +1,8 @@
 """Search route — full-text search."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
-from ..auth.users import User
-from ..deps import call_mcp_tool, get_current_user
+from ..deps import call_mcp_tool
 
 router = APIRouter(tags=["reporting"])
 
@@ -14,7 +13,6 @@ async def search(
     entity_type: str | None = None,
     project_id: str | None = None,
     limit: int = 20,
-    current_user: User = Depends(get_current_user),
 ):
     """Full-text search across entities."""
     args = {"query": query, "limit": limit}

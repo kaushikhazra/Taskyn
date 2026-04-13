@@ -1,18 +1,10 @@
-import { lazy, Suspense, useEffect, type ReactNode } from 'react';
-import { useNavigate, type RouteObject } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { lazy, Suspense } from 'react';
+import { type RouteObject } from 'react-router-dom';
 import { AppShell } from '@/components/templates/AppShell';
 import { ErrorBoundary } from '@/components/organisms';
 
 /* ============================================================
-   Eager imports — auth pages load instantly, no async gates
-   ============================================================ */
-import { LoginPage } from '@/pages/LoginPage';
-import { SignupPage } from '@/pages/SignupPage';
-import { OnboardingPage } from '@/pages/OnboardingPage';
-
-/* ============================================================
-   Lazy-loaded pages — behind ProtectedRoute auth gate anyway
+   Lazy-loaded pages
    ============================================================ */
 const DashboardPage = lazy(() => import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })));
 const CompaniesPage = lazy(() => import('@/pages/CompaniesPage').then((m) => ({ default: m.CompaniesPage })));
@@ -37,27 +29,9 @@ function LoadingFallback() {
 }
 
 /* ============================================================
-   Redirect — hard navigation via window.location.
-   React Router v7's createBrowserRouter transitions are
-   unreliable for cross-route redirects triggered by state
-   changes. A full page navigation is simple and bulletproof.
+   Shell wrapper — wraps all app pages in AppShell + ErrorBoundary
    ============================================================ */
-function Redirect({ to }: { to: string }) {
-  useEffect(() => {
-    window.location.replace(to);
-  }, [to]);
-  return <LoadingFallback />;
-}
-
-/* ============================================================
-   Protected Route — waits for auth, hard-redirects to login
-   ============================================================ */
-function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth();
-
-  if (loading) return <LoadingFallback />;
-  if (!user) return <Redirect to="/login" />;
-
+function ShellPage({ children }: { children: React.ReactNode }) {
   return (
     <AppShell>
       <ErrorBoundary>
@@ -68,151 +42,56 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 }
 
 /* ============================================================
-   Guest Route — renders immediately, no loading gate.
-   Redirects only when auth confirms a logged-in user.
-   ============================================================ */
-function GuestRoute({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!loading && user) {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [loading, user, navigate]);
-
-  return <ErrorBoundary>{children}</ErrorBoundary>;
-}
-
-/* ============================================================
-   Root redirect — auth-aware, no blind redirect chain
-   ============================================================ */
-function RootRedirect() {
-  const { user, loading } = useAuth();
-
-  if (loading) return <LoadingFallback />;
-  return <Redirect to={user ? '/dashboard' : '/login'} />;
-}
-
-/* ============================================================
    Route definitions
    ============================================================ */
 export const routes: RouteObject[] = [
   {
-    path: '/login',
-    element: (
-      <GuestRoute>
-        <LoginPage />
-      </GuestRoute>
-    ),
-  },
-  {
-    path: '/signup',
-    element: (
-      <GuestRoute>
-        <SignupPage />
-      </GuestRoute>
-    ),
-  },
-  {
-    path: '/onboarding',
-    element: (
-      <GuestRoute>
-        <OnboardingPage />
-      </GuestRoute>
-    ),
+    path: '/',
+    element: <ShellPage><DashboardPage /></ShellPage>,
   },
   {
     path: '/dashboard',
-    element: (
-      <ProtectedRoute>
-        <DashboardPage />
-      </ProtectedRoute>
-    ),
+    element: <ShellPage><DashboardPage /></ShellPage>,
   },
   {
     path: '/companies',
-    element: (
-      <ProtectedRoute>
-        <CompaniesPage />
-      </ProtectedRoute>
-    ),
+    element: <ShellPage><CompaniesPage /></ShellPage>,
   },
   {
     path: '/projects',
-    element: (
-      <ProtectedRoute>
-        <ProjectsPage />
-      </ProtectedRoute>
-    ),
+    element: <ShellPage><ProjectsPage /></ShellPage>,
   },
   {
     path: '/projects/:projectId',
-    element: (
-      <ProtectedRoute>
-        <ProjectDetailPage />
-      </ProtectedRoute>
-    ),
+    element: <ShellPage><ProjectDetailPage /></ShellPage>,
   },
   {
     path: '/nodes/:nodeId',
-    element: (
-      <ProtectedRoute>
-        <NodeDetailPage />
-      </ProtectedRoute>
-    ),
+    element: <ShellPage><NodeDetailPage /></ShellPage>,
   },
   {
     path: '/kanban',
-    element: (
-      <ProtectedRoute>
-        <KanbanPage />
-      </ProtectedRoute>
-    ),
+    element: <ShellPage><KanbanPage /></ShellPage>,
   },
   {
     path: '/kanban/:projectId',
-    element: (
-      <ProtectedRoute>
-        <KanbanPage />
-      </ProtectedRoute>
-    ),
+    element: <ShellPage><KanbanPage /></ShellPage>,
   },
   {
     path: '/planner',
-    element: (
-      <ProtectedRoute>
-        <PlannerPage />
-      </ProtectedRoute>
-    ),
+    element: <ShellPage><PlannerPage /></ShellPage>,
   },
   {
     path: '/planner/:projectId',
-    element: (
-      <ProtectedRoute>
-        <PlannerPage />
-      </ProtectedRoute>
-    ),
+    element: <ShellPage><PlannerPage /></ShellPage>,
   },
   {
     path: '/tracker',
-    element: (
-      <ProtectedRoute>
-        <TrackerPage />
-      </ProtectedRoute>
-    ),
+    element: <ShellPage><TrackerPage /></ShellPage>,
   },
   {
     path: '/settings',
-    element: (
-      <ProtectedRoute>
-        <SettingsPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/',
-    element: <RootRedirect />,
+    element: <ShellPage><SettingsPage /></ShellPage>,
   },
   {
     path: '*',

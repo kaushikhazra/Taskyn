@@ -1,4 +1,4 @@
-/* API client — base request function with auth and token refresh. */
+/* API client — base request function. */
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
@@ -13,47 +13,6 @@ export class ApiError extends Error {
   }
 }
 
-let accessToken: string | null = null;
-let refreshPromise: Promise<string | null> | null = null;
-
-export function setAccessToken(token: string | null): void {
-  accessToken = token;
-}
-
-export function getAccessToken(): string | null {
-  return accessToken;
-}
-
-async function refreshAccessToken(): Promise<string | null> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5_000);
-  try {
-    const res = await fetch(`${API_BASE}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-      signal: controller.signal,
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    accessToken = data.accessToken;
-    return accessToken;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-/** Deduplicated token refresh — multiple 401s trigger only one refresh. */
-export async function ensureToken(): Promise<string | null> {
-  if (!refreshPromise) {
-    refreshPromise = refreshAccessToken().finally(() => {
-      refreshPromise = null;
-    });
-  }
-  return refreshPromise;
-}
-
 async function request<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -63,28 +22,10 @@ async function request<T>(
     ...((options.headers as Record<string, string>) || {}),
   };
 
-  if (accessToken) {
-    headers['Authorization'] = `Bearer ${accessToken}`;
-  }
-
-  let res = await fetch(`${API_BASE}${endpoint}`, {
+  const res = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers,
-    credentials: 'include',
   });
-
-  // On 401, attempt token refresh and retry once
-  if (res.status === 401 && accessToken) {
-    const newToken = await ensureToken();
-    if (newToken) {
-      headers['Authorization'] = `Bearer ${newToken}`;
-      res = await fetch(`${API_BASE}${endpoint}`, {
-        ...options,
-        headers,
-        credentials: 'include',
-      });
-    }
-  }
 
   if (!res.ok) {
     let detail = 'Request failed';

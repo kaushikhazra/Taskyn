@@ -41,10 +41,10 @@ class RootErrorBoundary extends Component<{ children: ReactNode }, { error: Erro
           <h1 style={{ color: '#e5a300' }}>Something went wrong</h1>
           <p>{this.state.error.message}</p>
           <button
-            onClick={() => { this.setState({ error: null }); window.location.href = '/login'; }}
+            onClick={() => { this.setState({ error: null }); window.location.href = '/'; }}
             style={{ marginTop: 16, padding: '8px 20px', background: '#e5a300', color: '#111', border: 'none', borderRadius: 6, cursor: 'pointer' }}
           >
-            Go to Login
+            Go to Dashboard
           </button>
         </div>
       );

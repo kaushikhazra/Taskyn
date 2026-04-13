@@ -4,7 +4,7 @@ import { Avatar, Icon } from '@/components/atoms';
 import { useAuth } from '@/hooks/useAuth';
 
 export function UserMenu() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -20,14 +20,6 @@ export function UserMenu() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [handleClickOutside]);
 
-  const handleLogout = async () => {
-    setOpen(false);
-    await logout();
-    navigate('/login');
-  };
-
-  if (!user) return null;
-
   return (
     <div ref={ref} className={`user-menu ${open ? 'open' : ''}`}>
       <div onClick={() => setOpen((v) => !v)}>
@@ -36,7 +28,6 @@ export function UserMenu() {
       <div className="user-dropdown">
         <div className="user-dropdown-header">
           <div className="user-dropdown-name">{user.name}</div>
-          <div className="user-dropdown-email">{user.email}</div>
         </div>
         <div className="user-dropdown-menu">
           <button
@@ -52,11 +43,6 @@ export function UserMenu() {
           >
             <Icon name="help" size={16} />
             Help & Support
-          </button>
-          <div className="user-dropdown-divider" />
-          <button className="user-dropdown-item danger" onClick={handleLogout}>
-            <Icon name="logout" size={16} />
-            Log out
           </button>
         </div>
       </div>

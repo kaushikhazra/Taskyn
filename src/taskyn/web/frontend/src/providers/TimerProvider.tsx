@@ -6,7 +6,6 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { useAuth } from '@/hooks/useAuth';
 import { useActiveTimers } from '@/hooks/queries/useTimerQuery';
 import { useStartTimer, useStopTimer } from '@/hooks/mutations/useTimerMutations';
 import type { ActiveTimer } from '@/types';
@@ -24,14 +23,10 @@ export interface TimerContextValue {
 export const TimerContext = createContext<TimerContextValue | null>(null);
 
 export function TimerProvider({ children }: { children: ReactNode }) {
-  const { user, loading: authLoading } = useAuth();
-
-  const isAuthenticated = !authLoading && !!user;
-
-  // Single poll for all active timers — 1s refetchInterval when authenticated
+  // Always enabled — single-user local app, no auth gate
   const { data: activeTimers = [], isPending } = useActiveTimers({
-    enabled: isAuthenticated,
-    refetchInterval: isAuthenticated ? 1_000 : undefined,
+    enabled: true,
+    refetchInterval: 1_000,
   });
 
   const startTimer = useStartTimer();
@@ -79,7 +74,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     [stopTimer],
   );
 
-  const loading = (isPending && isAuthenticated) || startTimer.isPending || stopTimer.isPending;
+  const loading = isPending || startTimer.isPending || stopTimer.isPending;
 
   return (
     <TimerContext.Provider

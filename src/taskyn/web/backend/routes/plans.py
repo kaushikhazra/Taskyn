@@ -2,10 +2,9 @@
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Response
 
-from ..auth.users import User
-from ..deps import call_mcp_tool, get_current_user
+from ..deps import call_mcp_tool
 from ..schemas.plans import (
     CarryOverRequest,
     PlanCreate,
@@ -22,24 +21,15 @@ router = APIRouter(prefix="/plans", tags=["plans"])
 
 
 @router.get("/by-date")
-async def get_plan_by_date(
-    date: date,
-    actor: str,
-    current_user: User = Depends(get_current_user),
-):
+async def get_plan_by_date(date: date, actor: str):
     """Get plan for a specific date+actor. Returns null if no plan exists."""
-    result = await call_mcp_tool("pm_get_plan", {
+    return await call_mcp_tool("pm_get_plan", {
         "plan_date": date.isoformat(), "actor": actor
     })
-    return result
 
 
 @router.get("/weekly")
-async def get_weekly_plan(
-    week_start_date: date,
-    actor: str | None = None,
-    current_user: User = Depends(get_current_user),
-):
+async def get_weekly_plan(week_start_date: date, actor: str | None = None):
     """Get weekly plan summary."""
     args = {"week_start_date": week_start_date.isoformat()}
     if actor:
@@ -48,12 +38,7 @@ async def get_weekly_plan(
 
 
 @router.get("/monthly")
-async def get_monthly_plan(
-    year: int,
-    month: int,
-    actor: str | None = None,
-    current_user: User = Depends(get_current_user),
-):
+async def get_monthly_plan(year: int, month: int, actor: str | None = None):
     """Get monthly plan summary."""
     args = {"year": year, "month": month}
     if actor:
@@ -62,11 +47,7 @@ async def get_monthly_plan(
 
 
 @router.get("/vs-actual")
-async def get_plan_vs_actual(
-    plan_date: date,
-    actor: str,
-    current_user: User = Depends(get_current_user),
-):
+async def get_plan_vs_actual(plan_date: date, actor: str):
     """Get plan vs actual comparison for a date."""
     return await call_mcp_tool("pm_plan_vs_actual", {
         "plan_date": plan_date.isoformat(), "actor": actor
@@ -77,32 +58,21 @@ async def get_plan_vs_actual(
 
 
 @router.patch("/items/{item_id}")
-async def update_plan_item(
-    item_id: str,
-    data: PlanItemUpdate,
-    current_user: User = Depends(get_current_user),
-):
+async def update_plan_item(item_id: str, data: PlanItemUpdate):
     """Update a plan item (outcome, notes, planned minutes)."""
     args = {"item_id": item_id, **data.model_dump(exclude_unset=True)}
     return await call_mcp_tool("pm_update_plan_item", args)
 
 
 @router.delete("/items/{item_id}", status_code=204)
-async def remove_plan_item(
-    item_id: str,
-    current_user: User = Depends(get_current_user),
-):
+async def remove_plan_item(item_id: str):
     """Remove an item from a plan."""
     await call_mcp_tool("pm_remove_plan_item", {"item_id": item_id})
     return Response(status_code=204)
 
 
 @router.post("/items/{item_id}/reorder")
-async def reorder_plan_item(
-    item_id: str,
-    data: PlanItemReorder,
-    current_user: User = Depends(get_current_user),
-):
+async def reorder_plan_item(item_id: str, data: PlanItemReorder):
     """Reorder a plan item to a new 1-based position."""
     return await call_mcp_tool("pm_reorder_plan_item", {
         "item_id": item_id, "new_position": data.new_position
@@ -120,7 +90,6 @@ async def list_plans(
     status: str | None = None,
     limit: int = 50,
     offset: int = 0,
-    current_user: User = Depends(get_current_user),
 ):
     """List plans with optional filters."""
     args = {}
@@ -138,10 +107,7 @@ async def list_plans(
 
 
 @router.post("", status_code=201)
-async def create_plan(
-    data: PlanCreate,
-    current_user: User = Depends(get_current_user),
-):
+async def create_plan(data: PlanCreate):
     """Create a new plan."""
     args = data.model_dump(exclude_none=True)
     if data.items:
@@ -150,30 +116,20 @@ async def create_plan(
 
 
 @router.get("/{plan_id}")
-async def get_plan(
-    plan_id: str,
-    current_user: User = Depends(get_current_user),
-):
+async def get_plan(plan_id: str):
     """Get a plan by ID."""
     return await call_mcp_tool("pm_get_plan", {"plan_id": plan_id})
 
 
 @router.patch("/{plan_id}")
-async def update_plan(
-    plan_id: str,
-    data: PlanUpdate,
-    current_user: User = Depends(get_current_user),
-):
+async def update_plan(plan_id: str, data: PlanUpdate):
     """Update a plan."""
     args = {"plan_id": plan_id, **data.model_dump(exclude_unset=True)}
     return await call_mcp_tool("pm_update_plan", args)
 
 
 @router.delete("/{plan_id}", status_code=204)
-async def delete_plan(
-    plan_id: str,
-    current_user: User = Depends(get_current_user),
-):
+async def delete_plan(plan_id: str):
     """Delete a plan."""
     await call_mcp_tool("pm_delete_plan", {"plan_id": plan_id})
     return Response(status_code=204)
@@ -183,22 +139,14 @@ async def delete_plan(
 
 
 @router.post("/{plan_id}/items", status_code=201)
-async def add_plan_item(
-    plan_id: str,
-    data: PlanItemAdd,
-    current_user: User = Depends(get_current_user),
-):
+async def add_plan_item(plan_id: str, data: PlanItemAdd):
     """Add an item to a plan."""
     args = {"plan_id": plan_id, **data.model_dump(exclude_none=True)}
     return await call_mcp_tool("pm_add_plan_item", args)
 
 
 @router.post("/{plan_id}/carry-over")
-async def carry_over_plan(
-    plan_id: str,
-    data: CarryOverRequest,
-    current_user: User = Depends(get_current_user),
-):
+async def carry_over_plan(plan_id: str, data: CarryOverRequest):
     """Carry over pending/partial items to another date."""
     args = {"source_plan_id": plan_id, "target_date": data.target_date.isoformat()}
     if data.item_ids:

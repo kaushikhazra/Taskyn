@@ -14,16 +14,10 @@ from functools import lru_cache
 from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastmcp import Client
 from fastmcp.exceptions import ClientError
-from jose import JWTError
-
-from .auth.jwt import decode_token
-from .auth.users import User, get_user
 
 logger = logging.getLogger(__name__)
-security = HTTPBearer()
 
 
 # ---------------------------------------------------------------------------
@@ -204,23 +198,3 @@ async def call_mcp_tool(tool_name: str, args: dict) -> Any:
 
         logger.exception("Unexpected error calling MCP tool %s", tool_name)
         raise HTTPException(500, detail=f"MCP client error: {e}")
-
-
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> User:
-    """Dependency that extracts and validates the current user from JWT."""
-    token = credentials.credentials
-    try:
-        payload = decode_token(token)
-        if payload.get("type") != "access":
-            raise HTTPException(401, detail="Invalid token type")
-
-        user_id = payload["sub"]
-        user = get_user(user_id)
-        if not user:
-            raise HTTPException(401, detail="User not found")
-
-        return user
-    except JWTError:
-        raise HTTPException(401, detail="Invalid or expired token")

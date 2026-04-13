@@ -1,9 +1,8 @@
 """Edge routes — CRUD."""
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Response
 
-from ..auth.users import User
-from ..deps import call_mcp_tool, get_current_user
+from ..deps import call_mcp_tool
 from ..schemas.edges import EdgeCreate
 
 router = APIRouter(prefix="/edges", tags=["edges"])
@@ -15,7 +14,6 @@ async def list_edges(
     source_id: str | None = None,
     target_id: str | None = None,
     edge_type: str | None = None,
-    current_user: User = Depends(get_current_user),
 ):
     """List edges with optional filters."""
     args = {}
@@ -31,19 +29,13 @@ async def list_edges(
 
 
 @router.post("", status_code=201)
-async def create_edge(
-    data: EdgeCreate,
-    current_user: User = Depends(get_current_user),
-):
+async def create_edge(data: EdgeCreate):
     """Create a new edge."""
     return await call_mcp_tool("pm_create_edge", data.model_dump())
 
 
 @router.delete("/{edge_id}", status_code=204)
-async def delete_edge(
-    edge_id: str,
-    current_user: User = Depends(get_current_user),
-):
+async def delete_edge(edge_id: str):
     """Delete an edge."""
     await call_mcp_tool("pm_delete_edge", {"edge_id": edge_id})
     return Response(status_code=204)

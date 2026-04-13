@@ -1,9 +1,8 @@
 """Activity route — recent activity log."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
-from ..auth.users import User
-from ..deps import call_mcp_tool, get_current_user
+from ..deps import call_mcp_tool
 
 router = APIRouter(tags=["reporting"])
 
@@ -13,7 +12,6 @@ async def get_activity(
     limit: int = 20,
     entity_type: str | None = None,
     entity_id: str | None = None,
-    current_user: User = Depends(get_current_user),
 ):
     """Get recent activity log."""
     args = {"limit": limit}
