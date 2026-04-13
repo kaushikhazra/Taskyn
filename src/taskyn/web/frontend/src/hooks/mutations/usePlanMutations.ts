@@ -108,8 +108,8 @@ export function useRemovePlanItem() {
 /**
  * Optimistic reorder — moves the item visually on drag, reverts on error.
  *
- * The cache key is `byDate(date, actor)` because the day-view plan is the
- * active query when the user drags items.
+ * The cache key is `list({ date_from, date_to })` because the day-view now
+ * fetches all actors' plans for a date via usePlansForDate.
  *
  * N-01 fix: newPosition is 1-based from the UI; splice uses `newPosition - 1`
  * for the 0-based insert index.
@@ -117,7 +117,7 @@ export function useRemovePlanItem() {
 export function useReorderPlanItem(date: string, actor: string) {
   const qc = useQueryClient();
   const { addToast } = useToast();
-  const planKey = queryKeys.plans.byDate(date, actor);
+  const planKey = queryKeys.plans.list({ date_from: date, date_to: date });
 
   return useMutation({
     mutationFn: ({ itemId, newPosition }: { itemId: string; newPosition: number }) =>
@@ -125,29 +125,32 @@ export function useReorderPlanItem(date: string, actor: string) {
 
     onMutate: async ({ itemId, newPosition }) => {
       await qc.cancelQueries({ queryKey: planKey });
-      const previous = qc.getQueryData<Plan>(planKey);
+      const previous = qc.getQueryData<Plan[]>(planKey);
 
-      qc.setQueryData<Plan | null>(planKey, (old) => {
+      qc.setQueryData<Plan[]>(planKey, (old) => {
         if (!old) return old;
-        const items = [...old.items];
+        return old.map((plan) => {
+          if (plan.actor !== actor) return plan;
+          const items = [...plan.items];
 
-        // Remove dragged item
-        const dragIndex = items.findIndex((i) => i.id === itemId);
-        if (dragIndex === -1) return old;
-        const dragged = items.splice(dragIndex, 1)[0];
-        if (!dragged) return old;
+          // Remove dragged item
+          const dragIndex = items.findIndex((i) => i.id === itemId);
+          if (dragIndex === -1) return plan;
+          const dragged = items.splice(dragIndex, 1)[0];
+          if (!dragged) return plan;
 
-        // Insert at new position (1-based newPosition → 0-based splice index)
-        const insertAt = Math.min(newPosition - 1, items.length);
-        items.splice(insertAt, 0, dragged);
+          // Insert at new position (1-based newPosition → 0-based splice index)
+          const insertAt = Math.min(newPosition - 1, items.length);
+          items.splice(insertAt, 0, dragged);
 
-        // Recompute display_order to match visual order (1-based — see backend F-05)
-        const reordered = items.map((item, idx) => ({
-          ...item,
-          display_order: idx + 1,
-        }));
+          // Recompute display_order to match visual order (1-based — see backend F-05)
+          const reordered = items.map((item, idx) => ({
+            ...item,
+            display_order: idx + 1,
+          }));
 
-        return { ...old, items: reordered };
+          return { ...plan, items: reordered };
+        });
       });
 
       return { previous };
@@ -171,11 +174,14 @@ export function useReorderPlanItem(date: string, actor: string) {
  *
  * Used for the primary interaction: clicking completed / partial / dropped
  * on a plan item in the day view.
+ *
+ * The cache key is `list({ date_from, date_to })` because the day-view now
+ * fetches all actors' plans for a date via usePlansForDate.
  */
 export function useUpdatePlanItem(date: string, actor: string) {
   const qc = useQueryClient();
   const { addToast } = useToast();
-  const planKey = queryKeys.plans.byDate(date, actor);
+  const planKey = queryKeys.plans.list({ date_from: date, date_to: date });
 
   return useMutation({
     mutationFn: ({ itemId, data }: { itemId: string; data: PlanItemUpdate }) =>
@@ -183,16 +189,19 @@ export function useUpdatePlanItem(date: string, actor: string) {
 
     onMutate: async ({ itemId, data }) => {
       await qc.cancelQueries({ queryKey: planKey });
-      const previous = qc.getQueryData<Plan>(planKey);
+      const previous = qc.getQueryData<Plan[]>(planKey);
 
-      qc.setQueryData<Plan | null>(planKey, (old) => {
+      qc.setQueryData<Plan[]>(planKey, (old) => {
         if (!old) return old;
-        return {
-          ...old,
-          items: old.items.map((item) =>
-            item.id === itemId ? { ...item, ...data } : item,
-          ),
-        };
+        return old.map((plan) => {
+          if (plan.actor !== actor) return plan;
+          return {
+            ...plan,
+            items: plan.items.map((item) =>
+              item.id === itemId ? { ...item, ...data } : item,
+            ),
+          };
+        });
       });
 
       return { previous };

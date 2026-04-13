@@ -28,6 +28,22 @@ async def get_plan_by_date(date: date, actor: str):
     })
 
 
+@router.get("/for-date")
+async def get_plans_for_date(date: date):
+    """Get all actors' plans for a date, each enriched with items. Returns Plan[]."""
+    plans_raw = await call_mcp_tool("pm_list_plans", {
+        "date_from": date.isoformat(), "date_to": date.isoformat()
+    })
+    if not plans_raw:
+        return []
+    enriched = []
+    for plan in plans_raw:
+        full_plan = await call_mcp_tool("pm_get_plan", {"plan_id": plan["id"]})
+        if full_plan:
+            enriched.append(full_plan)
+    return enriched
+
+
 @router.get("/weekly")
 async def get_weekly_plan(week_start_date: date, actor: str | None = None):
     """Get weekly plan summary."""
@@ -110,6 +126,10 @@ async def list_plans(
 async def create_plan(data: PlanCreate):
     """Create a new plan."""
     args = data.model_dump(exclude_none=True)
+    # MCP tool uses "plan_date", schema uses "date" — rename
+    if "date" in args:
+        d = args.pop("date")
+        args["plan_date"] = d.isoformat() if hasattr(d, "isoformat") else d
     if data.items:
         args["items"] = [i.model_dump(exclude_none=True) for i in data.items]
     return await call_mcp_tool("pm_create_plan", args)

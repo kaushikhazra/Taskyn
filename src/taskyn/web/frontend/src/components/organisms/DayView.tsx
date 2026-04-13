@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { usePlan } from '@/hooks/queries/usePlans';
+import { usePlansForDate } from '@/hooks/queries/usePlans';
 import { useCreatePlan, useDeletePlan } from '@/hooks/mutations/usePlanMutations';
 import { useToast } from '@/hooks/useToast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -11,6 +11,7 @@ import { DayPlanPanel } from '@/components/organisms/DayPlanPanel';
 import { NodePickerModal } from '@/components/organisms/NodePickerModal';
 import { CarryOverModal } from '@/components/organisms/CarryOverModal';
 import { useHotkeys } from '@/hooks/useHotkeys';
+import type { Plan } from '@/types';
 
 interface DayViewProps {
   date: string;
@@ -27,9 +28,12 @@ function formatDate(iso: string): string {
 export function DayView({ date, actor, onNavigateToDate }: DayViewProps) {
   const queryClient = useQueryClient();
   const { addToast } = useToast();
-  const { data: plan, isLoading } = usePlan(date, actor);
+  const { data: plans = [], isLoading } = usePlansForDate(date);
   const createPlan = useCreatePlan();
   const deletePlan = useDeletePlan();
+
+  // Track which plan is the target for modal actions
+  const [activePlan, setActivePlan] = useState<Plan | null>(null);
 
   // Modal states
   const [nodePickerOpen, setNodePickerOpen] = useState(false);
@@ -43,7 +47,9 @@ export function DayView({ date, actor, onNavigateToDate }: DayViewProps) {
       {
         onError: (err: Error & { status?: number }) => {
           if (err.status === 409 || err.message?.includes('409')) {
-            queryClient.invalidateQueries({ queryKey: queryKeys.plans.byDate(date, actor) });
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.plans.list({ date_from: date, date_to: date }),
+            });
             addToast('info', 'A plan already exists for this date');
           }
         },
@@ -51,21 +57,28 @@ export function DayView({ date, actor, onNavigateToDate }: DayViewProps) {
     );
   }, [createPlan, date, actor, queryClient, addToast]);
 
-  // ── Plan deletion with conditional confirmation (M-04) ────────
-  const handleDeleteRequest = useCallback(() => {
+  // ── Per-plan modal handlers ───────────────────────────────────
+  const handleAddItem = useCallback((plan: Plan) => {
+    setActivePlan(plan);
+    setNodePickerOpen(true);
+  }, []);
+
+  const handleCarryOver = useCallback((plan: Plan) => {
+    setActivePlan(plan);
+    setCarryOverOpen(true);
+  }, []);
+
+  const handleDeleteRequest = useCallback((plan: Plan) => {
+    setActivePlan(plan);
     setDeleteConfirmOpen(true);
   }, []);
 
   const handleDeleteConfirm = useCallback(() => {
-    if (!plan) return;
-    deletePlan.mutate(plan.id);
+    if (!activePlan) return;
+    deletePlan.mutate(activePlan.id);
     setDeleteConfirmOpen(false);
-  }, [plan, deletePlan]);
-
-  const recordedOutcomeCount = useMemo(() => {
-    if (!plan) return 0;
-    return plan.items.filter((item) => item.outcome !== 'pending').length;
-  }, [plan]);
+    setActivePlan(null);
+  }, [activePlan, deletePlan]);
 
   // ── CarryOver success handler ─────────────────────────────────
   const handleCarryOverSuccess = useCallback(
@@ -75,17 +88,32 @@ export function DayView({ date, actor, onNavigateToDate }: DayViewProps) {
     [onNavigateToDate],
   );
 
-  // ── Keyboard shortcuts (A = Add Item, only when plan is active) ──
-  const isCompleted = plan?.status === 'completed';
+  // ── Keyboard shortcut: A = Add Item to the first active plan ──
+  const firstActivePlan = useMemo(
+    () => plans.find((p) => p.status !== 'completed') ?? null,
+    [plans],
+  );
   useHotkeys(
     useMemo(
       () =>
-        plan && !isCompleted
-          ? [{ key: 'A', label: 'Add Item', action: () => setNodePickerOpen(true) }]
+        firstActivePlan
+          ? [
+              {
+                key: 'A',
+                label: 'Add Item',
+                action: () => handleAddItem(firstActivePlan),
+              },
+            ]
           : [],
-      [plan, isCompleted],
+      [firstActivePlan, handleAddItem],
     ),
   );
+
+  // ── Delete confirmation: count outcomes across active plan ────
+  const recordedOutcomeCount = useMemo(() => {
+    if (!activePlan) return 0;
+    return activePlan.items.filter((item) => item.outcome !== 'pending').length;
+  }, [activePlan]);
 
   // ── Render ────────────────────────────────────────────────────
 
@@ -101,7 +129,7 @@ export function DayView({ date, actor, onNavigateToDate }: DayViewProps) {
     );
   }
 
-  if (!plan) {
+  if (plans.length === 0) {
     return (
       <div className="planner-view">
         <EmptyPlanState
@@ -115,28 +143,31 @@ export function DayView({ date, actor, onNavigateToDate }: DayViewProps) {
 
   return (
     <div className="planner-view">
-      <DayPlanPanel
-        plan={plan}
-        date={date}
-        actor={actor}
-        onCarryOver={() => setCarryOverOpen(true)}
-        onAddItem={() => setNodePickerOpen(true)}
-        onDeletePlan={handleDeleteRequest}
-      />
+      {plans.map((plan) => (
+        <DayPlanPanel
+          key={plan.id}
+          plan={plan}
+          date={date}
+          actor={plan.actor}
+          onCarryOver={() => handleCarryOver(plan)}
+          onAddItem={() => handleAddItem(plan)}
+          onDeletePlan={() => handleDeleteRequest(plan)}
+        />
+      ))}
 
       {/* NodePickerModal (US-7) */}
       <NodePickerModal
         open={nodePickerOpen}
         onClose={() => setNodePickerOpen(false)}
-        planId={plan.id}
+        planId={activePlan?.id ?? ''}
       />
 
       {/* CarryOverModal (US-11) */}
-      {carryOverOpen && (
+      {carryOverOpen && activePlan && (
         <CarryOverModal
           open={carryOverOpen}
           onClose={() => setCarryOverOpen(false)}
-          plan={plan}
+          plan={activePlan}
           onSuccess={handleCarryOverSuccess}
         />
       )}

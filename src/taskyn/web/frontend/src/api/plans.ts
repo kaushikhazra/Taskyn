@@ -30,6 +30,10 @@ export const plansApi = {
   getByDate: (date: string, actor: string) =>
     api.get<Plan | null>(`/plans/by-date?date=${date}&actor=${actor}`),
 
+  /** Fetch all actors' plans for a date, each enriched with items. */
+  forDate: (date: string) =>
+    api.get<Plan[]>(`/plans/for-date?date=${date}`),
+
   update: (planId: string, data: PlanUpdate) =>
     api.patch<Plan>(`/plans/${planId}`, data),
 

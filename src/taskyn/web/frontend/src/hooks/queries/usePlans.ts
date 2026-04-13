@@ -18,6 +18,16 @@ export function usePlan(date: string, actor: string, options?: QueryOptions) {
   });
 }
 
+/** Fetch ALL plans for a given date regardless of actor (multi-actor day view). */
+export function usePlansForDate(date: string, options?: QueryOptions) {
+  return useQuery({
+    queryKey: queryKeys.plans.list({ date_from: date, date_to: date }),
+    queryFn: () => plansApi.forDate(date),
+    enabled: !!date,
+    refetchInterval: options?.refetchInterval ?? false,
+  });
+}
+
 /** Fetch a plan by ID (used after carry-over to show target plan). */
 export function usePlanById(planId: string | undefined) {
   return useQuery({
