@@ -7,7 +7,10 @@ export type PlannerView = 'day' | 'week' | 'month';
 const VALID_VIEWS: PlannerView[] = ['day', 'week', 'month'];
 
 function toISODate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function parseDate(value: string | null): Date {
