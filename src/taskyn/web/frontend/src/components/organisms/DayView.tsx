@@ -10,6 +10,7 @@ import { EmptyPlanState } from '@/components/molecules/EmptyPlanState';
 import { DayPlanPanel } from '@/components/organisms/DayPlanPanel';
 import { NodePickerModal } from '@/components/organisms/NodePickerModal';
 import { CarryOverModal } from '@/components/organisms/CarryOverModal';
+import { useHotkeys } from '@/hooks/useHotkeys';
 
 interface DayViewProps {
   date: string;
@@ -72,6 +73,18 @@ export function DayView({ date, actor, onNavigateToDate }: DayViewProps) {
       if (onNavigateToDate) onNavigateToDate(targetDate);
     },
     [onNavigateToDate],
+  );
+
+  // ── Keyboard shortcuts (A = Add Item, only when plan is active) ──
+  const isCompleted = plan?.status === 'completed';
+  useHotkeys(
+    useMemo(
+      () =>
+        plan && !isCompleted
+          ? [{ key: 'A', label: 'Add Item', action: () => setNodePickerOpen(true) }]
+          : [],
+      [plan, isCompleted],
+    ),
   );
 
   // ── Render ────────────────────────────────────────────────────
