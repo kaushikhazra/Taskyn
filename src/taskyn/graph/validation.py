@@ -2,7 +2,7 @@
 
 from taskyn.db.models import Node, Edge
 from taskyn.methodologies import get_methodology
-from taskyn.exceptions import ValidationError, InvalidTransitionError
+from taskyn.exceptions import ValidationError
 
 
 def validate_node_creation(
@@ -64,13 +64,6 @@ def validate_node_update(
             errors.append(f"Invalid status '{new_status}' for node type '{node.node_type}'. Valid statuses: {valid_statuses}")
             return errors
 
-        # Validate transition is allowed
-        if node.status != new_status:
-            if not methodology.validate_status_transition(node.node_type, node.status, new_status):
-                nt = methodology.get_node_type(node.node_type)
-                allowed = nt.allowed_transitions.get(node.status, []) if nt else []
-                errors.append(f"Invalid transition from '{node.status}' to '{new_status}'. Allowed: {allowed}")
-
         # Check blocked status requires reason
         if new_status == "blocked" and not blocked_reason and not node.blocked_reason:
             errors.append("Blocked status requires a blocked_reason")
@@ -99,11 +92,6 @@ def validate_status_transition(
         valid_statuses = nt.valid_statuses if nt else []
         raise ValidationError(f"Invalid status '{new_status}' for node type '{node.node_type}'. Valid: {valid_statuses}")
 
-    if node.status != new_status:
-        if not methodology.validate_status_transition(node.node_type, node.status, new_status):
-            nt = methodology.get_node_type(node.node_type)
-            allowed = nt.allowed_transitions.get(node.status, []) if nt else []
-            raise InvalidTransitionError(node.node_type, node.status, new_status, allowed)
 
 
 def validate_edge_creation(

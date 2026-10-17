@@ -106,14 +106,16 @@ class TestSubjectTransitions:
     @pytest.mark.parametrize(
         "from_status,to_status",
         [
+            # Backward / skip transitions — all allowed now
             ("planned", "completed"),
             ("completed", "active"),
             ("archived", "planned"),
             ("archived", "active"),
         ],
     )
-    def test_invalid_transitions(self, m, from_status, to_status):
-        assert not m.validate_status_transition("subject", from_status, to_status)
+    def test_backward_transitions_allowed(self, m, from_status, to_status):
+        """Any valid status can transition to any other valid status."""
+        assert m.validate_status_transition("subject", from_status, to_status)
 
 
 class TestTopicTransitions:
@@ -157,14 +159,16 @@ class TestTopicTransitions:
     @pytest.mark.parametrize(
         "from_status,to_status",
         [
+            # Previously "invalid" — all now allowed
             ("completed", "researching"),
             ("completed", "practicing"),
             ("archived", "planned"),
             ("archived", "researching"),
         ],
     )
-    def test_invalid_transitions(self, m, from_status, to_status):
-        assert not m.validate_status_transition("topic", from_status, to_status)
+    def test_backward_transitions_allowed(self, m, from_status, to_status):
+        """Any valid status can transition to any other valid status."""
+        assert m.validate_status_transition("topic", from_status, to_status)
 
 
 class TestActivityTransitions:
@@ -189,6 +193,7 @@ class TestActivityTransitions:
     @pytest.mark.parametrize(
         "from_status,to_status",
         [
+            # Previously "invalid" — all now allowed
             ("todo", "done"),
             ("done", "todo"),
             ("done", "in_progress"),
@@ -196,8 +201,9 @@ class TestActivityTransitions:
             ("cancelled", "in_progress"),
         ],
     )
-    def test_invalid_transitions(self, m, from_status, to_status):
-        assert not m.validate_status_transition("activity", from_status, to_status)
+    def test_backward_transitions_allowed(self, m, from_status, to_status):
+        """Any valid status can transition to any other valid status."""
+        assert m.validate_status_transition("activity", from_status, to_status)
 
 
 # --- Edge types ---
@@ -210,8 +216,8 @@ class TestEdgeTypes:
     def m(self):
         return get_methodology("learning")
 
-    def test_three_edge_types(self, m):
-        assert set(m.edge_types.keys()) == {"parent", "depends_on", "relates_to"}
+    def test_four_edge_types(self, m):
+        assert set(m.edge_types.keys()) == {"parent", "sequence", "depends_on", "relates_to"}
 
     def test_parent_edge(self, m):
         p = m.edge_types["parent"]

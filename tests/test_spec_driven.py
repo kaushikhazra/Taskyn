@@ -61,9 +61,10 @@ def test_spec_driven_edge_types():
     edge_types = methodology.edge_types
 
     assert "parent" in edge_types
+    assert "sequence" in edge_types
     assert "depends_on" in edge_types
     assert "blocks" in edge_types
-    assert len(edge_types) == 3
+    assert len(edge_types) == 4
 
 
 # ============================================================
@@ -151,22 +152,26 @@ def test_task_workflow(temp_db):
     assert task.status == "done"
 
 
-def test_phase_invalid_transitions(temp_db):
-    """Test that invalid transitions are rejected for phase nodes."""
+def test_phase_any_to_any_transitions(temp_db):
+    """Phase nodes can transition to any valid status — no gate on direction."""
     company = create_company("Test Co")
     project = create_project(company.id, "P", Methodology.SPEC_DRIVEN)
 
     spec = create_node(project.id, "spec", "Feature")
+    assert spec.status == "draft"
 
-    # Can't go from draft directly to done
-    with pytest.raises(ValidationError, match="Invalid transition"):
-        update_node(spec.id, status="done")
-
-    # Can't go backwards from done
-    spec = update_node(spec.id, status="active")
+    # Skip forward: draft → done
     spec = update_node(spec.id, status="done")
-    with pytest.raises(ValidationError, match="Invalid transition"):
-        update_node(spec.id, status="draft")
+    assert spec.status == "done"
+
+    # Backward: done → draft (reopen)
+    spec = update_node(spec.id, status="draft")
+    assert spec.status == "draft"
+
+    # Skip: draft → active → back to draft
+    spec = update_node(spec.id, status="active")
+    spec = update_node(spec.id, status="draft")
+    assert spec.status == "draft"
 
 
 # ============================================================
@@ -206,16 +211,21 @@ def test_todo_cancelled(temp_db):
     assert t2.status == "cancelled"
 
 
-def test_todo_invalid_transitions(temp_db):
-    """Test invalid transitions for todo nodes."""
+def test_todo_any_to_any_transitions(temp_db):
+    """Todo nodes can transition to any valid status — no gate on direction."""
     company = create_company("Test Co")
     project = create_project(company.id, "P", Methodology.SPEC_DRIVEN)
 
     todo = create_node(project.id, "todo", "A task")
+    assert todo.status == "todo"
 
-    # Can't go from todo directly to done
-    with pytest.raises(ValidationError, match="Invalid transition"):
-        update_node(todo.id, status="done")
+    # Skip forward: todo → done directly
+    todo = update_node(todo.id, status="done")
+    assert todo.status == "done"
+
+    # Backward: done → todo (reopen)
+    todo = update_node(todo.id, status="todo")
+    assert todo.status == "todo"
 
 
 # ============================================================

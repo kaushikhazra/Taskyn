@@ -101,32 +101,26 @@ def test_bulk_update_status(tasks):
         assert node.status == "in_progress"
 
 
-def test_bulk_update_status_validation_failure(tasks):
-    """Test bulk status update with invalid transitions."""
-    # Try to transition from todo directly to done (invalid in classic_agile)
+def test_bulk_update_status_skip_forward(tasks):
+    """Bulk status update allows skip-forward transitions (todo → done)."""
     node_ids = [t.id for t in tasks]
 
+    # Skip forward: todo → done directly — all should succeed now
     result = bulk_update_status(node_ids, "done")
 
-    # All should fail due to invalid transition
+    assert len(result.succeeded) == 3
+    assert len(result.failed) == 0
+
+
+def test_bulk_update_status_invalid_status_name(tasks):
+    """Bulk status update rejects entirely unknown status names."""
+    node_ids = [t.id for t in tasks]
+
+    result = bulk_update_status(node_ids, "nonexistent_status")
+
+    # All should fail — invalid status name
     assert len(result.succeeded) == 0
     assert len(result.failed) == 3
-
-
-def test_bulk_update_status_partial_success(tasks):
-    """Test bulk status update where some succeed and some fail."""
-    # Start first task
-    start_node(tasks[0].id)
-
-    node_ids = [t.id for t in tasks]
-
-    # Try to transition all to done
-    result = bulk_update_status(node_ids, "done")
-
-    # Only the first (in_progress) can transition to done
-    assert len(result.succeeded) == 1
-    assert len(result.failed) == 2
-    assert tasks[0].id in result.succeeded
 
 
 def test_bulk_reassign(tasks):

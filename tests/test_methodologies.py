@@ -67,18 +67,27 @@ def test_classic_agile_edge_types():
 
 
 def test_validate_status_transition():
-    """Test status transition validation."""
+    """Test status transition validation.
+
+    Any valid status can transition to any other valid status — the methodology
+    defines *which* statuses exist, but does not gate movement between them.
+    """
     methodology = get_methodology("classic_agile")
 
-    # Valid transitions
+    # Forward transitions
     assert methodology.validate_status_transition("task", "todo", "in_progress")
     assert methodology.validate_status_transition("task", "in_progress", "done")
     assert methodology.validate_status_transition("story", "backlog", "ready")
 
-    # Invalid transitions
-    assert not methodology.validate_status_transition("task", "todo", "done")
-    assert not methodology.validate_status_transition("task", "done", "todo")
-    assert not methodology.validate_status_transition("story", "done", "backlog")
+    # Backward / skip transitions — all allowed
+    assert methodology.validate_status_transition("task", "todo", "done")
+    assert methodology.validate_status_transition("task", "done", "todo")
+    assert methodology.validate_status_transition("story", "done", "backlog")
+
+    # Unknown target status still returns False (target must be a valid status)
+    assert not methodology.validate_status_transition("task", "todo", "nonexistent")
+    # Unknown source status is irrelevant — only the target is checked
+    assert methodology.validate_status_transition("task", "nonexistent", "done")
 
 
 def test_validate_edge():

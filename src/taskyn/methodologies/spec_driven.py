@@ -92,6 +92,13 @@ class SpecDrivenMethodology(BaseMethodology):
                 max_per_source=1,
                 allows_cycles=False,
             ),
+            "sequence": EdgeTypeDefinition(
+                name="sequence",
+                source_types=_ALL_TYPES,
+                target_types=_ALL_TYPES,
+                max_per_source=None,
+                allows_cycles=False,
+            ),
             "depends_on": EdgeTypeDefinition(
                 name="depends_on",
                 source_types=_ALL_TYPES,

@@ -4,7 +4,7 @@ import pytest
 
 from taskyn.core import create_company, create_project
 from taskyn.graph import create_node, get_node, list_nodes, update_node, delete_node
-from taskyn.exceptions import NotFoundError, ValidationError, InvalidTransitionError
+from taskyn.exceptions import NotFoundError, ValidationError
 
 
 @pytest.fixture
@@ -101,14 +101,42 @@ def test_update_node_status(project):
     assert updated.status == "ready"
 
 
-def test_update_node_invalid_transition(project):
-    """Test updating node status with invalid transition."""
+def test_update_node_invalid_status(project):
+    """Test updating node status to an unrecognised status name."""
     node = create_node(project.id, node_type="story", title="Test")
     assert node.status == "backlog"
 
-    # Can't go directly from backlog to done
+    # A completely unknown status is still rejected
     with pytest.raises(ValidationError):
-        update_node(node.id, status="done")
+        update_node(node.id, status="nonexistent_status")
+
+
+def test_update_node_backward_transition(project):
+    """Test backward transitions — any valid status can move to any other valid status."""
+    node = create_node(project.id, node_type="story", title="Test")
+    assert node.status == "backlog"
+
+    # Forward: backlog → in_progress → done
+    node = update_node(node.id, status="in_progress")
+    assert node.status == "in_progress"
+    node = update_node(node.id, status="done")
+    assert node.status == "done"
+
+    # Backward: done → ready (reopen)
+    node = update_node(node.id, status="ready")
+    assert node.status == "ready"
+
+    # Backward: ready → backlog
+    node = update_node(node.id, status="backlog")
+    assert node.status == "backlog"
+
+    # Skip-forward: backlog → done (no gate)
+    node = update_node(node.id, status="done")
+    assert node.status == "done"
+
+    # Backward: done → in_progress
+    node = update_node(node.id, status="in_progress")
+    assert node.status == "in_progress"
 
 
 def test_update_node_to_done_sets_completed_at(project):

@@ -32,6 +32,7 @@ class Methodology(str, Enum):
     CLASSIC_AGILE = "classic_agile"
     SPEC_DRIVEN = "spec_driven"
     LEARNING = "learning"
+    EXTENDED_SPEC = "extended_spec"
 
 
 class PlanStatus(str, Enum):

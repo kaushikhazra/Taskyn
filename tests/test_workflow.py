@@ -203,6 +203,49 @@ def test_story_workflow(project):
 
 
 # ============================================================
+# Backward Transition Tests
+# ============================================================
+
+
+def test_reopen_done_task(task):
+    """done → todo: tasks can be reopened after incorrect completion."""
+    from taskyn.graph import update_node as graph_update_node
+
+    start_node(task.id, actor="developer")
+    result = complete_node(task.id, actor="developer")
+    assert result.status == "done"
+
+    # Reopen: done → todo (backward transition)
+    reopened = graph_update_node(task.id, status="todo")
+    assert reopened.status == "todo"
+
+
+def test_reopen_done_task_to_in_progress(task):
+    """done → in_progress: task sent back directly to active work."""
+    from taskyn.graph import update_node as graph_update_node
+
+    start_node(task.id, actor="developer")
+    result = complete_node(task.id, actor="developer")
+    assert result.status == "done"
+
+    # Jump back to in_progress
+    result = graph_update_node(task.id, status="in_progress")
+    assert result.status == "in_progress"
+
+
+def test_skip_forward_transition(project):
+    """backlog → done directly: no gate should block it."""
+    from taskyn.graph import update_node as graph_update_node
+
+    story = create_story(project.id, title="Skip-forward story")
+    assert story.status == "backlog"
+
+    result = graph_update_node(story.id, status="done")
+    assert result.status == "done"
+    assert result.completed_at is not None
+
+
+# ============================================================
 # Multi-Actor Scoping Tests
 # ============================================================
 

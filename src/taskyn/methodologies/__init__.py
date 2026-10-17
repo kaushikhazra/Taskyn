@@ -8,6 +8,7 @@ from taskyn.methodologies.base import (
 from taskyn.methodologies.classic_agile import ClassicAgileMethodology
 from taskyn.methodologies.spec_driven import SpecDrivenMethodology
 from taskyn.methodologies.learning import LearningMethodology
+from taskyn.methodologies.extended_spec import ExtendedSpecMethodology
 
 # Methodology registry
 _METHODOLOGIES: dict[str, BaseMethodology] = {}
@@ -37,6 +38,7 @@ def methodology_exists(name: str) -> bool:
 _register_methodology(ClassicAgileMethodology())
 _register_methodology(SpecDrivenMethodology())
 _register_methodology(LearningMethodology())
+_register_methodology(ExtendedSpecMethodology())
 
 
 __all__ = [

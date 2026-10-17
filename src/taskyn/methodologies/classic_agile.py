@@ -94,6 +94,13 @@ class ClassicAgileMethodology(BaseMethodology):
                 max_per_source=1,  # A node has exactly one parent
                 allows_cycles=False,
             ),
+            "sequence": EdgeTypeDefinition(
+                name="sequence",
+                source_types=["epic", "story", "task"],
+                target_types=["epic", "story", "task"],
+                max_per_source=None,
+                allows_cycles=False,
+            ),
             "depends_on": EdgeTypeDefinition(
                 name="depends_on",
                 source_types=["task", "story", "epic"],

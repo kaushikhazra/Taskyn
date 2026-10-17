@@ -86,12 +86,15 @@ class BaseMethodology(ABC):
     def validate_status_transition(
         self, node_type: str, old_status: str, new_status: str
     ) -> bool:
-        """Check if a status transition is allowed."""
-        nt = self.get_node_type(node_type)
-        if nt is None:
-            return False
-        allowed = nt.allowed_transitions.get(old_status, [])
-        return new_status in allowed
+        """Check if a status transition is allowed.
+
+        Any status can transition to any other valid status for the node type.
+        The methodology defines *which* statuses exist, but does not gate movement
+        between them — reopen, rollback, and correction flows are always permitted.
+        ``allowed_transitions`` is retained on ``NodeTypeDefinition`` for
+        documentation/reporting purposes only.
+        """
+        return self.validate_status(node_type, new_status)
 
     def get_initial_status(self, node_type: str) -> str | None:
         """Get the initial status for a node type."""
